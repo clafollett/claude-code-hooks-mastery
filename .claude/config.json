@@ -1,6 +1,6 @@
 {
   "tts": {
-    "enabled": true,
+    "enabled": false,
     "provider": "macos",
     "voices": {
       "macos": {
