@@ -160,7 +160,8 @@ def trigger_conversation_tts(input_data):
             return
         
         # Skip if it contains mainly tool calls
-        if '<function_calls>' in latest_response or latest_response.count('```') > 2:
+        MAX_CODE_BLOCKS = 2
+        if '<function_calls>' in latest_response or latest_response.count('```') > MAX_CODE_BLOCKS:
             return
         
         # Get script directory and construct path to response TTS
@@ -170,7 +171,7 @@ def trigger_conversation_tts(input_data):
         if not tts_script.exists():
             return
         
-        # Trigger TTS in background (don't wait) - remove silent mode for debugging
+        # Trigger TTS in the background without waiting for completion
         subprocess.Popen([
             "uv", "run", str(tts_script), latest_response
         ])

@@ -3,7 +3,6 @@
 # requires-python = ">=3.8"
 # ///
 
-import os
 import sys
 import subprocess
 from pathlib import Path
@@ -12,10 +11,14 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 from text_utils import clean_text_for_speech
 
-def speak_with_macos(text, voice="Lee (Premium)"):
+def speak_with_macos(text, voice=None):
     """Speak text using native macOS TTS with specified voice."""
     
     try:
+        # Use provided voice or fall back to system default
+        if voice is None:
+            voice = "Zoe (Premium)"  # Default from config system
+        
         # Clean text for speech
         clean_text = clean_text_for_speech(text)
         

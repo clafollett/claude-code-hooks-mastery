@@ -105,7 +105,7 @@ def speak_response(text):
         )
         
         play(audio)
-        print("✅ Marvin has spoken!")
+        print("✅ ElevenLabs TTS completed!")
         return True
         
     except ImportError:
