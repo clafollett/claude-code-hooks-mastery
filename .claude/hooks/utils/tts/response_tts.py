@@ -14,55 +14,10 @@ import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Import config utility
+# Import config and text utilities
 sys.path.append(str(Path(__file__).parent.parent))
 from config import get_tts_config, get_voice_for_provider, is_tts_enabled, get_elevenlabs_config, get_macos_config
-
-def clean_text_for_speech(text):
-    """
-    Clean text to make it suitable for TTS.
-    Remove code blocks, excessive formatting, and keep conversational parts.
-    """
-    # Remove code blocks (```...```)
-    text = re.sub(r'```[\s\S]*?```', '', text)
-    
-    # Remove inline code (`...`)
-    text = re.sub(r'`[^`]+`', '', text)
-    
-    # Remove markdown links [text](url)
-    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
-    
-    # Remove markdown headers (#, ##, ###)
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    
-    # Remove bullet points and list markers
-    text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE)
-    text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)
-    
-    # Remove excessive whitespace
-    text = re.sub(r'\n\s*\n', ' ', text)
-    text = re.sub(r'\s+', ' ', text)
-    
-    # Remove tool call indicators and XML-like tags
-    text = re.sub(r'<[^>]+>', '', text)
-    
-    # Remove all emojis for better speech
-    # This regex matches most Unicode emoji ranges
-    text = re.sub(r'[\U0001F600-\U0001F64F]', '', text)  # emoticons
-    text = re.sub(r'[\U0001F300-\U0001F5FF]', '', text)  # symbols & pictographs
-    text = re.sub(r'[\U0001F680-\U0001F6FF]', '', text)  # transport & map
-    text = re.sub(r'[\U0001F1E0-\U0001F1FF]', '', text)  # flags
-    text = re.sub(r'[\U00002600-\U000027BF]', '', text)  # misc symbols
-    text = re.sub(r'[\U0001F900-\U0001F9FF]', '', text)  # supplemental symbols
-    
-    # Clean up and limit length
-    text = text.strip()
-    
-    # Limit to reasonable TTS length (about 2 minutes of speech)
-    if len(text) > 2000:
-        text = text[:2000] + "..."
-    
-    return text
+from text_utils import clean_text_for_speech
 
 def speak_with_native_macos(text):
     """Speak text using native macOS TTS with enhanced quality settings."""
@@ -104,8 +59,8 @@ def speak_with_native_macos(text):
         print(f"❌ Error: {e}", file=sys.stderr)
         return False
 
-def speak_with_marvin(text):
-    """Speak text using Marvin's voice via ElevenLabs."""
+def speak_response(text):
+    """Speak text using configured TTS provider (ElevenLabs or macOS)."""
     load_dotenv()
     
     # Check config for TTS provider preference
@@ -164,7 +119,7 @@ def main():
     """Command line interface for response TTS."""
     if len(sys.argv) > 1:
         text = " ".join(sys.argv[1:])
-        success = speak_with_marvin(text)
+        success = speak_response(text)
         sys.exit(0 if success else 1)
     else:
         print("Usage: ./response_tts.py 'text to speak'")

@@ -1,11 +1,11 @@
 {
   "tts": {
     "enabled": false,
-    "provider": "elevenlabs",
+    "provider": "macos",
     "voices": {
       "macos": {
         "voice": "Lee (Premium)",
-        "rate": 175,
+        "rate": 190,
         "quality": 127
       },
       "elevenlabs": {
@@ -15,7 +15,7 @@
       }
     },
     "responses": {
-      "enabled": false
+      "enabled": true
     },
     "completion": {
       "enabled": false

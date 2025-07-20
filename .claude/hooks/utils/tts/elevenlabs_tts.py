@@ -71,7 +71,7 @@ def main():
                 voice_id = elevenlabs_config['voice_id']
                 model_id = elevenlabs_config['model']
                 output_format = elevenlabs_config['output_format']
-            except:
+            except ImportError:
                 # Fallback to hardcoded values
                 voice_id = "FNMROvc7ZdHldafWFMqC"
                 model_id = "eleven_turbo_v2_5"

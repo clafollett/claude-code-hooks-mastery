@@ -91,7 +91,7 @@ def save_config(config):
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
         return True
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return False
 
 def get_tts_config():

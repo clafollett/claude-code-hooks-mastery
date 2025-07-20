@@ -175,8 +175,8 @@ def trigger_conversation_tts(input_data):
             "uv", "run", str(tts_script), latest_response
         ])
         
-    except Exception:
-        # Fail silently
+    except (OSError, json.JSONDecodeError, subprocess.SubprocessError):
+        # Fail silently for expected file/process errors
         pass
 
 def announce_completion():
