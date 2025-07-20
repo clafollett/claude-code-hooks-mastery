@@ -82,6 +82,9 @@ Thumbs.db
 .env.test.local
 .env.production.local
 
+# Local configuration
+.claude/config.json
+
 # Logs
 logs/
 *.log
