@@ -174,14 +174,24 @@ def trigger_conversation_tts(input_data):
         if not tts_script.exists():
             return
         
-        # Trigger TTS in the background without waiting for completion
-        subprocess.Popen([
+        # Trigger TTS with proper process management
+        subprocess.run([
             "uv", "run", str(tts_script), latest_response
-        ])
+            ], 
+            capture_output=True,  # Capture output to prevent blocking
+            timeout=120,  # 120-second timeout to prevent hanging
+            check=False  # Don't raise exception on non-zero exit
+        )
         
-    except (OSError, json.JSONDecodeError, subprocess.SubprocessError):
-        # Fail silently for expected file/process errors
+    except subprocess.SubprocessError as e:
+        # Log subprocess errors for debugging
+        print(f"TTS subprocess error: {e}", file=sys.stderr)
+    except (OSError, json.JSONDecodeError):
+        # Silent failure for expected file/parsing errors
         pass
+    except Exception as e:
+        # Log any unexpected errors
+        print(f"TTS unexpected error: {e}", file=sys.stderr)
 
 def announce_completion():
     """Announce completion using the best available TTS service."""
@@ -210,12 +220,14 @@ def announce_completion():
         timeout=10  # 10-second timeout
         )
         
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
-        # Fail silently if TTS encounters issues
-        pass
-    except Exception:
-        # Fail silently for any other errors
-        pass
+    except subprocess.TimeoutExpired:
+        print("Completion TTS timeout after 10 seconds", file=sys.stderr)
+    except FileNotFoundError as e:
+        print(f"Completion TTS file not found: {e}", file=sys.stderr)
+    except subprocess.SubprocessError as e:
+        print(f"Completion TTS subprocess error: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Completion TTS unexpected error: {e}", file=sys.stderr)
 
 
 def main():

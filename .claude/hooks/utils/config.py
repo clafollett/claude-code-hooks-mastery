@@ -4,7 +4,6 @@
 # ///
 
 import json
-import os
 from pathlib import Path
 
 def get_config_path():
@@ -27,7 +26,8 @@ def load_config():
     default_config = {
         "tts": {
             "enabled": True,
-            "provider": "macos", 
+            "provider": "macos",
+            "text_length_limit": 2000,
             "voices": {
                 "macos": {
                     "voice": "Lee (Premium)",
@@ -128,6 +128,24 @@ def get_tts_provider():
     """Get the preferred TTS provider (macos, elevenlabs) - applies globally."""
     return get_tts_config().get('provider', 'macos')
 
+def get_active_tts_provider():
+    """Get the active TTS provider based on availability and config."""
+    import os  # Local import to avoid unused import warning
+    provider = get_tts_provider()
+    
+    # Check if ElevenLabs is configured and available
+    if provider == 'elevenlabs':
+        if os.getenv('ELEVENLABS_API_KEY'):
+            return 'elevenlabs'
+        # Fallback to macOS if ElevenLabs not available
+        return 'macos'
+    
+    return provider
+
+def get_text_length_limit():
+    """Get the maximum text length for TTS processing."""
+    return get_tts_config().get('text_length_limit', 2000)
+
 def get_voice_for_provider(provider):
     """Get the voice setting for a specific provider."""
     voices = get_tts_config().get('voices', {})
@@ -137,15 +155,6 @@ def get_macos_config():
     """Get macOS TTS configuration."""
     voices = get_tts_config().get('voices', {})
     macos_config = voices.get('macos', {})
-    
-    # Handle legacy string format for backwards compatibility with older configs
-    # where voice was stored as a simple string instead of an object
-    if isinstance(macos_config, str):
-        return {
-            'voice': macos_config,
-            'rate': 200,
-            'quality': 127
-        }
     
     return {
         'voice': macos_config.get('voice', 'Lee (Premium)'),

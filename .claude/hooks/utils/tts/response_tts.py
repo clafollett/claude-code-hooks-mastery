@@ -16,8 +16,34 @@ from dotenv import load_dotenv
 
 # Import config and text utilities
 sys.path.append(str(Path(__file__).parent.parent))
-from config import get_tts_config, get_voice_for_provider, is_tts_enabled, get_elevenlabs_config, get_macos_config
-from text_utils import clean_text_for_speech
+
+# Constants for fallback values
+DEFAULT_VOICE_ID = "FNMROvc7ZdHldafWFMqC"
+DEFAULT_MODEL_ID = "eleven_turbo_v2_5"
+DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
+
+try:
+    from config import get_active_tts_provider, get_elevenlabs_config, get_macos_config
+    from text_utils import clean_text_for_speech
+except ImportError as e:
+    if "config" in str(e):
+        print(f"❌ Config module import error: {e}", file=sys.stderr)
+        print("Using fallback configuration", file=sys.stderr)
+        # Define fallback functions
+        def get_active_tts_provider():
+            return 'macos'
+        def get_elevenlabs_config():
+            return {
+                'voice_id': DEFAULT_VOICE_ID,
+                'model': DEFAULT_MODEL_ID,
+                'output_format': DEFAULT_OUTPUT_FORMAT
+            }
+        def get_macos_config():
+            return {'voice': 'Lee (Premium)', 'rate': 200, 'quality': 127}
+        def clean_text_for_speech(text):
+            return text[:2000]
+    else:
+        raise
 
 def speak_with_native_macos(text):
     """Speak text using native macOS TTS with enhanced quality settings."""
@@ -45,43 +71,48 @@ def speak_with_native_macos(text):
             clean_text
         ], 
         capture_output=True,
-        text=True
+        text=True,
+        timeout=30
         )
         
         if result.returncode == 0:
             print(f"✅ {voice} has spoken!")
             return True
         else:
-            print(f"❌ Error: {result.stderr}", file=sys.stderr)
+            error_msg = result.stderr.strip() if result.stderr else "Unknown subprocess error"
+            print(f"❌ macOS TTS subprocess error: {error_msg}", file=sys.stderr)
             return False
         
+    except subprocess.TimeoutExpired:
+        print("❌ macOS TTS timeout after 30 seconds", file=sys.stderr)
+        return False
+    except FileNotFoundError:
+        print("❌ macOS 'say' command not found", file=sys.stderr)
+        return False
+    except OSError as e:
+        print(f"❌ macOS TTS OS error: {e}", file=sys.stderr)
+        return False
     except Exception as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
+        print(f"❌ Unexpected macOS TTS error: {e}", file=sys.stderr)
         return False
 
 def speak_response(text):
-    """Speak text using configured TTS provider (ElevenLabs or macOS)."""
+    """Speak text using configured TTS provider with consolidated logic."""
     load_dotenv()
     
-    # Check config for TTS provider preference
-    tts_config = get_tts_config()
-    provider = tts_config.get('provider', 'macos')
+    # Determine active TTS provider based on configuration and environment
+    provider = get_active_tts_provider()
     
-    # If config says use macOS, skip ElevenLabs entirely
     if provider == 'macos':
         return speak_with_native_macos(text)
     
-    # Only use ElevenLabs if explicitly configured AND API key available
-    api_key = os.getenv('ELEVENLABS_API_KEY')
-    if not api_key:
-        print("🔄 No ElevenLabs API key, using native macOS TTS", file=sys.stderr)
-        return speak_with_native_macos(text)
-    
+    # Handle ElevenLabs provider (get_active_tts_provider already checked API key availability)
     try:
         from elevenlabs.client import ElevenLabs
         from elevenlabs import play
         
         # Initialize client
+        api_key = os.getenv('ELEVENLABS_API_KEY')
         elevenlabs = ElevenLabs(api_key=api_key)
         
         # Clean text for speech
@@ -108,12 +139,18 @@ def speak_response(text):
         print("✅ ElevenLabs TTS completed!")
         return True
         
-    except ImportError:
-        print("❌ Error: elevenlabs package not available", file=sys.stderr)
-        return False
+    except ImportError as e:
+        if "elevenlabs" in str(e):
+            print(f"❌ ElevenLabs package not available: {e}", file=sys.stderr)
+            print("🔄 Falling back to macOS TTS", file=sys.stderr)
+            return speak_with_native_macos(text)
+        else:
+            # Re-raise if it's not an ElevenLabs import issue
+            raise
     except Exception as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
-        return False
+        print(f"❌ ElevenLabs TTS error: {e}", file=sys.stderr)
+        print("🔄 Falling back to macOS TTS", file=sys.stderr)
+        return speak_with_native_macos(text)
 
 def main():
     """Command line interface for response TTS."""

@@ -1,11 +1,11 @@
 {
   "tts": {
-    "enabled": false,
+    "enabled": true,
     "provider": "macos",
     "voices": {
       "macos": {
         "voice": "Lee (Premium)",
-        "rate": 175,
+        "rate": 185,
         "quality": 127
       },
       "elevenlabs": {
@@ -25,6 +25,6 @@
     }
   },
   "engineer": {
-    "name": "Cali"
+    "name": ""
   }
 }

@@ -4,6 +4,12 @@
 # ///
 
 import re
+import sys
+from pathlib import Path
+
+# Import config for text length limit
+sys.path.append(str(Path(__file__).parent))
+from config import get_text_length_limit
 
 def clean_text_for_speech(text):
     """
@@ -39,10 +45,14 @@ def clean_text_for_speech(text):
     # Clean up and limit length
     text = text.strip()
     
-    # Limit to reasonable TTS length (about 2 minutes of speech at 175 WPM)
-    TTS_TEXT_LENGTH_LIMIT = 2000
-    if len(text) > TTS_TEXT_LENGTH_LIMIT:
-        text = text[:TTS_TEXT_LENGTH_LIMIT] + "..."
+    # Limit to configured TTS length with fallback
+    try:
+        text_limit = get_text_length_limit()
+    except Exception:
+        text_limit = 2000  # Fallback if config unavailable
+        
+    if len(text) > text_limit:
+        text = text[:text_limit] + "..."
     
     return text
 
