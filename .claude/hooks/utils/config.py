@@ -23,19 +23,32 @@ def get_config_path():
 
 def load_config():
     """Load configuration from config.json with fallback to environment variables."""
+    import platform
+    
+    # Platform-specific defaults
+    is_macos = platform.system() == "Darwin"
+    default_provider = "macos" if is_macos else "pyttsx3"
+    default_macos_voice = "Alex"  # Alex is the default macOS system voice
+    
     default_config = {
         "tts": {
             "enabled": True,
-            "provider": "macos",
+            "provider": default_provider,
             "text_length_limit": 2000,
             "voices": {
                 "macos": {
-                    "voice": "Lee (Premium)",
-                    "rate": 200,
+                    "voice": default_macos_voice,
+                    "rate": 190,
                     "quality": 127
                 },
+                "pyttsx3": {
+                    "voice": "default",
+                    "rate": 190,
+                    "volume": 0.9
+                },
                 "elevenlabs": {
-                    "voice_id": "FNMROvc7ZdHldafWFMqC",
+                    # Charlie
+                    "voice_id": "IKne3meq5aSn9XLyUdCD",
                     "model": "eleven_turbo_v2_5",
                     "output_format": "mp3_44100_128"
                 }

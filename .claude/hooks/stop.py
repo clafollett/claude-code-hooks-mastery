@@ -13,7 +13,6 @@ import sys
 import random
 import subprocess
 from pathlib import Path
-from datetime import datetime
 
 try:
     from dotenv import load_dotenv
@@ -23,19 +22,22 @@ except ImportError:
 
 # Import config utility
 sys.path.append(str(Path(__file__).parent / "utils"))
-from config import is_response_tts_enabled, is_completion_tts_enabled
+from config import is_response_tts_enabled, is_completion_tts_enabled, get_engineer_name
 
 
 def get_completion_messages():
-    """Return list of friendly completion messages."""
+    """Return list of friendly completion messages with engineer name."""
+    engineer_name = get_engineer_name()
+    name_prefix = f"Hey {engineer_name}! " if engineer_name else ""
+    name_suffix = f", {engineer_name}!" if engineer_name else "!"
+    
     return [
-        "Work complete!",
-        "All done!",
-        "Task finished!",
-        "Job complete!",
-        "Ready for next task!"
+        f"{name_prefix}All done!",
+        f"{name_prefix}We're ready for next task!",
+        f"Work complete{name_suffix}",
+        f"Task finished{name_suffix}",
+        f"Job complete{name_suffix}"
     ]
-
 
 def get_tts_script_path():
     """
@@ -240,9 +242,9 @@ def main():
         # Read JSON input from stdin
         input_data = json.load(sys.stdin)
 
-        # Extract required fields
-        session_id = input_data.get("session_id", "")
-        stop_hook_active = input_data.get("stop_hook_active", False)
+        # Extract required fields (for future use)
+        # session_id = input_data.get("session_id", "")
+        # stop_hook_active = input_data.get("stop_hook_active", False)
 
         # Ensure log directory exists
         log_dir = os.path.join(os.getcwd(), "logs")
