@@ -1,0 +1,30 @@
+{
+  "tts": {
+    "enabled": false,
+    "provider": "elevenlabs",
+    "voices": {
+      "macos": {
+        "voice": "Lee (Premium)",
+        "rate": 175,
+        "quality": 127
+      },
+      "elevenlabs": {
+        "voice_id": "FNMROvc7ZdHldafWFMqC",
+        "model": "eleven_turbo_v2_5",
+        "output_format": "mp3_44100_128"
+      }
+    },
+    "responses": {
+      "enabled": false
+    },
+    "completion": {
+      "enabled": false
+    },
+    "notifications": {
+      "enabled": true
+    }
+  },
+  "engineer": {
+    "name": "Cali"
+  }
+}

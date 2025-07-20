@@ -21,6 +21,10 @@ try:
 except ImportError:
     pass  # dotenv is optional
 
+# Import config utility
+sys.path.append(str(Path(__file__).parent / "utils"))
+from config import is_response_tts_enabled, is_completion_tts_enabled
+
 
 def get_completion_messages():
     """Return list of friendly completion messages."""
@@ -112,9 +116,81 @@ def get_llm_completion_message():
     messages = get_completion_messages()
     return random.choice(messages)
 
+def trigger_conversation_tts(input_data):
+    """
+    Trigger TTS for conversational responses if enabled.
+    Reads the transcript to find the latest assistant response.
+    """
+    # Check if response TTS is enabled
+    if not is_response_tts_enabled():
+        return
+    
+    # Get transcript path
+    transcript_path = input_data.get('transcript_path')
+    if not transcript_path or not os.path.exists(transcript_path):
+        return
+    
+    try:
+        # Read the transcript file (JSONL format)
+        assistant_messages = []
+        with open(transcript_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entry = json.loads(line)
+                        # Check for assistant messages with text content
+                        if (entry.get('type') == 'assistant' and 
+                            entry.get('message', {}).get('content')):
+                            content = entry['message']['content']
+                            for item in content:
+                                if item.get('type') == 'text' and item.get('text'):
+                                    assistant_messages.append(item['text'])
+                    except json.JSONDecodeError:
+                        continue
+        
+        # Get the most recent assistant message
+        if not assistant_messages:
+            return
+        
+        latest_response = assistant_messages[-1]
+        
+        # Skip if it's too short or looks like a completion message
+        if len(latest_response.strip()) < 20:
+            return
+        
+        # Skip if it contains mainly tool calls
+        if '<function_calls>' in latest_response or latest_response.count('```') > 2:
+            return
+        
+        # Get script directory and construct path to response TTS
+        script_dir = Path(__file__).parent
+        tts_script = script_dir / "utils" / "tts" / "response_tts.py"
+        
+        if not tts_script.exists():
+            return
+        
+        # Trigger TTS in background (don't wait) - remove silent mode for debugging
+        subprocess.Popen([
+            "uv", "run", str(tts_script), latest_response
+        ])
+        
+    except Exception:
+        # Fail silently
+        pass
+
 def announce_completion():
     """Announce completion using the best available TTS service."""
     try:
+        # Skip completion announcement if response TTS is enabled
+        # (since assistant will already be speaking the response)
+        if is_response_tts_enabled():
+            return
+        
+        # Check if completion TTS is enabled
+        if not is_completion_tts_enabled():
+            return
+        
         tts_script = get_tts_script_path()
         if not tts_script:
             return  # No TTS scripts available
@@ -196,6 +272,9 @@ def main():
                         json.dump(chat_data, f, indent=2)
                 except Exception:
                     pass  # Fail silently
+
+        # Handle response TTS for conversational content
+        trigger_conversation_tts(input_data)
 
         # Announce completion via TTS
         announce_completion()

@@ -61,12 +61,28 @@ def main():
         print("🔊 Generating and playing...")
         
         try:
-            # Generate and play audio directly
+            # Import config for settings (fallback to hardcoded if not available)
+            try:
+                import sys
+                from pathlib import Path
+                sys.path.append(str(Path(__file__).parent.parent))
+                from config import get_elevenlabs_config
+                elevenlabs_config = get_elevenlabs_config()
+                voice_id = elevenlabs_config['voice_id']
+                model_id = elevenlabs_config['model']
+                output_format = elevenlabs_config['output_format']
+            except:
+                # Fallback to hardcoded values
+                voice_id = "FNMROvc7ZdHldafWFMqC"
+                model_id = "eleven_turbo_v2_5"
+                output_format = "mp3_44100_128"
+            
+            # Generate and play audio using config or fallback settings
             audio = elevenlabs.text_to_speech.convert(
                 text=text,
-                voice_id="WejK3H1m7MI9CHnIjW9K",  # Specified voice
-                model_id="eleven_turbo_v2_5",
-                output_format="mp3_44100_128",
+                voice_id=voice_id,
+                model_id=model_id,
+                output_format=output_format,
             )
             
             play(audio)
