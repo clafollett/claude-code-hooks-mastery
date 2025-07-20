@@ -7,17 +7,19 @@ import sys
 import subprocess
 from pathlib import Path
 
-# Import text utilities
+# Import text utilities and config
 sys.path.append(str(Path(__file__).parent.parent))
 from text_utils import clean_text_for_speech
+from config import get_macos_config
 
 def speak_with_macos(text, voice=None):
     """Speak text using native macOS TTS with specified voice."""
     
     try:
-        # Use provided voice or fall back to system default
+        # Use provided voice or get from config system
         if voice is None:
-            voice = "Zoe (Premium)"  # Default from config system
+            macos_config = get_macos_config()
+            voice = macos_config['voice']
         
         # Clean text for speech
         clean_text = clean_text_for_speech(text)

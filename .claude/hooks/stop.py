@@ -159,9 +159,12 @@ def trigger_conversation_tts(input_data):
         if len(latest_response.strip()) < 20:
             return
         
-        # Skip if it contains mainly tool calls
+        # Skip if it contains mainly tool calls or excessive code blocks
         MAX_CODE_BLOCKS = 2
-        if '<function_calls>' in latest_response or latest_response.count('```') > MAX_CODE_BLOCKS:
+        has_function_calls = '<function_calls>' in latest_response
+        has_many_code_blocks = latest_response.count('```') > MAX_CODE_BLOCKS
+        
+        if has_function_calls or has_many_code_blocks:
             return
         
         # Get script directory and construct path to response TTS

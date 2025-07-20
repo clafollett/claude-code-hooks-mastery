@@ -138,7 +138,8 @@ def get_macos_config():
     voices = get_tts_config().get('voices', {})
     macos_config = voices.get('macos', {})
     
-    # Handle legacy string format or return new object format
+    # Handle legacy string format for backwards compatibility with older configs
+    # where voice was stored as a simple string instead of an object
     if isinstance(macos_config, str):
         return {
             'voice': macos_config,

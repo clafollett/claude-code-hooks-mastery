@@ -39,9 +39,10 @@ def clean_text_for_speech(text):
     # Clean up and limit length
     text = text.strip()
     
-    # Limit to reasonable TTS length (about 2 minutes of speech)
-    if len(text) > 2000:
-        text = text[:2000] + "..."
+    # Limit to reasonable TTS length (about 2 minutes of speech at 175 WPM)
+    TTS_TEXT_LENGTH_LIMIT = 2000
+    if len(text) > TTS_TEXT_LENGTH_LIMIT:
+        text = text[:TTS_TEXT_LENGTH_LIMIT] + "..."
     
     return text
 
