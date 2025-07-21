@@ -21,6 +21,108 @@ DEFAULT_VOICE_ID = "FNMROvc7ZdHldafWFMqC"
 DEFAULT_MODEL_ID = "eleven_turbo_v2_5"
 DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
 
+# Master config system - single source of truth (used by both main and fallback)
+def _get_master_config():
+    """Master configuration object - single source of truth for all defaults."""
+    import platform
+    
+    is_macos = platform.system() == "Darwin"
+    default_provider = "macos" if is_macos else "pyttsx3"
+    default_macos_voice = "Alex"  # Alex is the default macOS system voice
+    
+    return {
+        "tts": {
+            "enabled": True,
+            "provider": default_provider,
+            "text_length_limit": 2000,
+            "timeout": 120,
+            "voices": {
+                "macos": {
+                    "voice": default_macos_voice,
+                    "rate": 190,
+                    "quality": 127
+                },
+                "pyttsx3": {
+                    "voice": "default",
+                    "rate": 190,
+                    "volume": 0.9
+                },
+                "elevenlabs": {
+                    "voice_id": "IKne3meq5aSn9XLyUdCD",
+                    "model": "eleven_turbo_v2_5",
+                    "output_format": "mp3_44100_128"
+                }
+            },
+            "responses": {
+                "enabled": True
+            },
+            "completion": {
+                "enabled": False
+            },
+            "notifications": {
+                "enabled": True
+            }
+        },
+        "engineer": {
+            "name": ""
+        }
+    }
+
+def _deep_merge(master, user):
+    """Deep merge user config into master config."""
+    import copy
+    result = copy.deepcopy(master)
+    
+    def merge_dict(target, source):
+        for key, value in source.items():
+            if key in target and isinstance(target[key], dict) and isinstance(value, dict):
+                merge_dict(target[key], value)
+            else:
+                target[key] = value
+    
+    merge_dict(result, user)
+    return result
+
+def _load_config_fallback():
+    """Load master config with user config.json overlay."""
+    import json
+    from pathlib import Path
+    
+    master_config = _get_master_config()
+    
+    try:
+        config_path = Path.cwd() / ".claude" / "config.json"
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                user_config = json.load(f)
+                return _deep_merge(master_config, user_config)
+    except Exception:
+        pass
+    
+    return master_config
+
+# Fallback function implementations using master config
+def _get_active_tts_provider_fallback():
+    config = _load_config_fallback()
+    return config['tts']['provider']
+
+def _get_elevenlabs_config_fallback():
+    config = _load_config_fallback()
+    return config['tts']['voices']['elevenlabs']
+
+def _get_macos_config_fallback():
+    config = _load_config_fallback()
+    return config['tts']['voices']['macos']
+
+def _get_tts_timeout_fallback():
+    config = _load_config_fallback()
+    return config['tts']['timeout']
+
+def _clean_text_for_speech_fallback(text):
+    config = _load_config_fallback()
+    limit = config['tts']['text_length_limit']
+    return text[:limit] if len(text) > limit else text
+
 try:
     from config import get_active_tts_provider, get_elevenlabs_config, get_macos_config, get_tts_timeout
     from text_utils import clean_text_for_speech
@@ -28,71 +130,26 @@ except ImportError as e:
     if "config" in str(e):
         print(f"❌ Config module import error: {e}", file=sys.stderr)
         print("Using fallback configuration", file=sys.stderr)
-        # Define fallback functions
-        def get_active_tts_provider():
-            return 'macos'
-        def get_elevenlabs_config():
-            return {
-                'voice_id': DEFAULT_VOICE_ID,
-                'model': DEFAULT_MODEL_ID,
-                'output_format': DEFAULT_OUTPUT_FORMAT
-            }
-        def get_macos_config():
-            try:
-                import json
-                from pathlib import Path
-                config_path = Path.cwd() / ".claude" / "config.json"
-                if config_path.exists():
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                        macos_config = config.get('tts', {}).get('voices', {}).get('macos', {})
-                        return {
-                            'voice': macos_config.get('voice', 'Alex'),
-                            'rate': macos_config.get('rate', 190),
-                            'quality': macos_config.get('quality', 127)
-                        }
-            except Exception:
-                pass
-            return {'voice': 'Alex', 'rate': 190, 'quality': 127}
-        def get_tts_timeout():
-            try:
-                import json
-                from pathlib import Path
-                config_path = Path.cwd() / ".claude" / "config.json"
-                if config_path.exists():
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                        return config.get('tts', {}).get('timeout', 120)
-            except Exception:
-                pass
-            return 120
-        def clean_text_for_speech(text):
-            # Try to get limit from a basic config system fallback
-            try:
-                import json
-                from pathlib import Path
-                config_path = Path.cwd() / ".claude" / "config.json"
-                if config_path.exists():
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                        limit = config.get('tts', {}).get('text_length_limit', 2000)
-                else:
-                    limit = 2000  # Default if no config file
-            except Exception:
-                limit = 2000  # Default if any error
-            return text[:limit] if len(text) > limit else text
+        # Assign fallback functions - they use the same master config logic!
+        get_active_tts_provider = _get_active_tts_provider_fallback
+        get_elevenlabs_config = _get_elevenlabs_config_fallback
+        get_macos_config = _get_macos_config_fallback
+        get_tts_timeout = _get_tts_timeout_fallback
+        clean_text_for_speech = _clean_text_for_speech_fallback
     else:
         raise
 
 def speak_with_native_macos(text):
     """Speak text using native macOS TTS with enhanced quality settings."""
+    # Get timeout outside try block to ensure it's available in except blocks
+    timeout = get_tts_timeout()
+    
     try:
         # Get macOS config with quality settings
         macos_config = get_macos_config()
         voice = macos_config['voice']
         rate = macos_config['rate']
         quality = macos_config['quality']
-        timeout = get_tts_timeout()
         
         # Clean text for speech
         clean_text = clean_text_for_speech(text)

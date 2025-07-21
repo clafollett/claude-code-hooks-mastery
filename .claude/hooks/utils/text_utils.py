@@ -11,16 +11,48 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from config import get_text_length_limit
 
+def preserve_inline_code_content(text):
+    """
+    Intelligently handle inline code - preserve the content for speech while removing wrapper tokens.
+    
+    Examples:
+    - "the `except` block" -> "the except block"  
+    - "use `get_config()` function" -> "use get_config() function"
+    - "set `timeout=30`" -> "set timeout=30"
+    
+    This preserves important technical terms that should be spoken naturally.
+    """
+    def extract_inline_content(match):
+        content = match.group(1)
+        
+        # If it's a single word (likely a keyword), preserve it
+        if re.match(r'^\w+$', content):
+            return content
+            
+        # If it's a simple function call or variable, preserve it
+        if re.match(r'^[\w_]+\(\)$', content) or re.match(r'^[\w_]+=[\w_]+$', content):
+            return content
+            
+        # If it's complex code (multiple operators, etc.), remove it
+        if any(char in content for char in [';', '{', '}', '[', ']', '&&', '||']):
+            return ' '
+            
+        # Default: preserve simple technical terms
+        return content
+    
+    # Apply intelligent inline code handling
+    return re.sub(r'`([^`]+)`', extract_inline_content, text)
+
 def clean_text_for_speech(text):
     """
     Clean text to make it suitable for TTS with natural speech markup.
     Remove code blocks, excessive formatting, and add speech pauses/emphasis.
     """
-    # Remove code blocks (```...```)
+    # Remove code blocks (```...```) entirely
     text = re.sub(r'```[\s\S]*?```', '', text)
     
-    # Remove inline code (`...`)
-    text = re.sub(r'`[^`]+`', '', text)
+    # Intelligently handle inline code - preserve content, strip wrapper tokens
+    text = preserve_inline_code_content(text)
     
     # Remove markdown links [text](url)
     text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
