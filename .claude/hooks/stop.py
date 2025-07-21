@@ -13,7 +13,6 @@ import sys
 import random
 import subprocess
 from pathlib import Path
-from datetime import datetime
 
 try:
     from dotenv import load_dotenv
@@ -21,17 +20,24 @@ try:
 except ImportError:
     pass  # dotenv is optional
 
+# Import config utility
+sys.path.append(str(Path(__file__).parent / "utils"))
+from config import is_response_tts_enabled, is_completion_tts_enabled, get_engineer_name
+
 
 def get_completion_messages():
-    """Return list of friendly completion messages."""
+    """Return list of friendly completion messages with engineer name."""
+    engineer_name = get_engineer_name()
+    name_prefix = f"Hey {engineer_name}! " if engineer_name else ""
+    name_suffix = f", {engineer_name}!" if engineer_name else "!"
+    
     return [
-        "Work complete!",
-        "All done!",
-        "Task finished!",
-        "Job complete!",
-        "Ready for next task!"
+        f"{name_prefix}All done!",
+        f"{name_prefix}We're ready for next task!",
+        f"Work complete{name_suffix}",
+        f"Task finished{name_suffix}",
+        f"Job complete{name_suffix}"
     ]
-
 
 def get_tts_script_path():
     """
@@ -112,9 +118,95 @@ def get_llm_completion_message():
     messages = get_completion_messages()
     return random.choice(messages)
 
+def trigger_conversation_tts(input_data):
+    """
+    Trigger TTS for conversational responses if enabled.
+    Reads the transcript to find the latest assistant response.
+    """
+    # Check if response TTS is enabled
+    if not is_response_tts_enabled():
+        return
+    
+    # Get transcript path
+    transcript_path = input_data.get('transcript_path')
+    if not transcript_path or not os.path.exists(transcript_path):
+        return
+    
+    try:
+        # Read the transcript file (JSONL format)
+        assistant_messages = []
+        with open(transcript_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entry = json.loads(line)
+                        # Check for assistant messages with text content
+                        if (entry.get('type') == 'assistant' and 
+                            entry.get('message', {}).get('content')):
+                            content = entry['message']['content']
+                            for item in content:
+                                if item.get('type') == 'text' and item.get('text'):
+                                    assistant_messages.append(item['text'])
+                    except json.JSONDecodeError:
+                        continue
+        
+        # Get the most recent assistant message
+        if not assistant_messages:
+            return
+        
+        latest_response = assistant_messages[-1]
+        
+        # Skip if it's too short or looks like a completion message
+        if len(latest_response.strip()) < 20:
+            return
+        
+        # Skip if it contains mainly tool calls or excessive code blocks
+        MAX_CODE_BLOCKS = 2
+        has_function_calls = '<function_calls>' in latest_response
+        has_many_code_blocks = latest_response.count('```') > MAX_CODE_BLOCKS
+        
+        if has_function_calls or has_many_code_blocks:
+            return
+        
+        # Get script directory and construct path to response TTS
+        script_dir = Path(__file__).parent
+        tts_script = script_dir / "utils" / "tts" / "response_tts.py"
+        
+        if not tts_script.exists():
+            return
+        
+        # Trigger TTS with proper process management
+        subprocess.run([
+            "uv", "run", str(tts_script), latest_response
+            ], 
+            capture_output=True,  # Capture output to prevent blocking
+            timeout=120,  # 120-second timeout to prevent hanging
+            check=False  # Don't raise exception on non-zero exit
+        )
+        
+    except subprocess.SubprocessError as e:
+        # Log subprocess errors for debugging
+        print(f"TTS subprocess error: {e}", file=sys.stderr)
+    except (OSError, json.JSONDecodeError):
+        # Silent failure for expected file/parsing errors
+        pass
+    except Exception as e:
+        # Log any unexpected errors
+        print(f"TTS unexpected error: {e}", file=sys.stderr)
+
 def announce_completion():
     """Announce completion using the best available TTS service."""
     try:
+        # Skip completion announcement if response TTS is enabled
+        # (since assistant will already be speaking the response)
+        if is_response_tts_enabled():
+            return
+        
+        # Check if completion TTS is enabled
+        if not is_completion_tts_enabled():
+            return
+        
         tts_script = get_tts_script_path()
         if not tts_script:
             return  # No TTS scripts available
@@ -130,12 +222,14 @@ def announce_completion():
         timeout=10  # 10-second timeout
         )
         
-    except (subprocess.TimeoutExpired, subprocess.SubprocessError, FileNotFoundError):
-        # Fail silently if TTS encounters issues
-        pass
-    except Exception:
-        # Fail silently for any other errors
-        pass
+    except subprocess.TimeoutExpired:
+        print("Completion TTS timeout after 10 seconds", file=sys.stderr)
+    except FileNotFoundError as e:
+        print(f"Completion TTS file not found: {e}", file=sys.stderr)
+    except subprocess.SubprocessError as e:
+        print(f"Completion TTS subprocess error: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"Completion TTS unexpected error: {e}", file=sys.stderr)
 
 
 def main():
@@ -148,9 +242,9 @@ def main():
         # Read JSON input from stdin
         input_data = json.load(sys.stdin)
 
-        # Extract required fields
-        session_id = input_data.get("session_id", "")
-        stop_hook_active = input_data.get("stop_hook_active", False)
+        # Extract required fields (for future use)
+        # session_id = input_data.get("session_id", "")
+        # stop_hook_active = input_data.get("stop_hook_active", False)
 
         # Ensure log directory exists
         log_dir = os.path.join(os.getcwd(), "logs")
@@ -196,6 +290,9 @@ def main():
                         json.dump(chat_data, f, indent=2)
                 except Exception:
                     pass  # Fail silently
+
+        # Handle response TTS for conversational content
+        trigger_conversation_tts(input_data)
 
         # Announce completion via TTS
         announce_completion()
