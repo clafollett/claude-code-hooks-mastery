@@ -3,6 +3,7 @@
     "enabled": true,
     "provider": "pyttsx3",
     "text_length_limit": 2000,
+    "timeout": 120,
     "voices": {
       "macos": {
         "voice": "Alex",
