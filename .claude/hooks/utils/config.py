@@ -35,6 +35,7 @@ def load_config():
             "enabled": True,
             "provider": default_provider,
             "text_length_limit": 2000,
+            "timeout": 120,
             "voices": {
                 "macos": {
                     "voice": default_macos_voice,
@@ -158,6 +159,10 @@ def get_active_tts_provider():
 def get_text_length_limit():
     """Get the maximum text length for TTS processing."""
     return get_tts_config().get('text_length_limit', 2000)
+
+def get_tts_timeout():
+    """Get the timeout in seconds for TTS operations."""
+    return get_tts_config().get('timeout', 120)
 
 def get_voice_for_provider(provider):
     """Get the voice setting for a specific provider."""

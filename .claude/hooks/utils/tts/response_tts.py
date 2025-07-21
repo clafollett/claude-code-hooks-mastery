@@ -9,7 +9,6 @@
 
 import os
 import sys
-import re
 import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
@@ -23,7 +22,7 @@ DEFAULT_MODEL_ID = "eleven_turbo_v2_5"
 DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
 
 try:
-    from config import get_active_tts_provider, get_elevenlabs_config, get_macos_config
+    from config import get_active_tts_provider, get_elevenlabs_config, get_macos_config, get_tts_timeout
     from text_utils import clean_text_for_speech
 except ImportError as e:
     if "config" in str(e):
@@ -39,9 +38,49 @@ except ImportError as e:
                 'output_format': DEFAULT_OUTPUT_FORMAT
             }
         def get_macos_config():
-            return {'voice': 'Lee (Premium)', 'rate': 200, 'quality': 127}
+            try:
+                import json
+                from pathlib import Path
+                config_path = Path.cwd() / ".claude" / "config.json"
+                if config_path.exists():
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                        macos_config = config.get('tts', {}).get('voices', {}).get('macos', {})
+                        return {
+                            'voice': macos_config.get('voice', 'Alex'),
+                            'rate': macos_config.get('rate', 190),
+                            'quality': macos_config.get('quality', 127)
+                        }
+            except Exception:
+                pass
+            return {'voice': 'Alex', 'rate': 190, 'quality': 127}
+        def get_tts_timeout():
+            try:
+                import json
+                from pathlib import Path
+                config_path = Path.cwd() / ".claude" / "config.json"
+                if config_path.exists():
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                        return config.get('tts', {}).get('timeout', 120)
+            except Exception:
+                pass
+            return 120
         def clean_text_for_speech(text):
-            return text[:2000]
+            # Try to get limit from a basic config system fallback
+            try:
+                import json
+                from pathlib import Path
+                config_path = Path.cwd() / ".claude" / "config.json"
+                if config_path.exists():
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                        limit = config.get('tts', {}).get('text_length_limit', 2000)
+                else:
+                    limit = 2000  # Default if no config file
+            except Exception:
+                limit = 2000  # Default if any error
+            return text[:limit] if len(text) > limit else text
     else:
         raise
 
@@ -53,6 +92,7 @@ def speak_with_native_macos(text):
         voice = macos_config['voice']
         rate = macos_config['rate']
         quality = macos_config['quality']
+        timeout = get_tts_timeout()
         
         # Clean text for speech
         clean_text = clean_text_for_speech(text)
@@ -72,7 +112,7 @@ def speak_with_native_macos(text):
         ], 
         capture_output=True,
         text=True,
-        timeout=30
+        timeout=timeout
         )
         
         if result.returncode == 0:
@@ -84,7 +124,7 @@ def speak_with_native_macos(text):
             return False
         
     except subprocess.TimeoutExpired:
-        print("❌ macOS TTS timeout after 30 seconds", file=sys.stderr)
+        print(f"❌ macOS TTS timeout after {timeout} seconds", file=sys.stderr)
         return False
     except FileNotFoundError:
         print("❌ macOS 'say' command not found", file=sys.stderr)
