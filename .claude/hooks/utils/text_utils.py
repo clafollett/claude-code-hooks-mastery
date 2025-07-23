@@ -11,6 +11,59 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 from config import get_text_length_limit
 
+# Compile regex patterns at module level for efficiency
+TECH_TERM_PATTERNS = {
+    # File extensions and formats
+    r'\bjson\b': 'jay-sawn',
+    r'\bxml\b': 'X M L',
+    r'\bhtml\b': 'H T M L',
+    r'\bcss\b': 'C S S',
+    r'\bjs\b': 'J S',
+    r'\bpy\b': 'python',
+    r'\bsql\b': 'sequel',
+    r'\byaml\b': 'yam-el',
+    r'\bcsv\b': 'C S V',
+    r'\bpdf\b': 'P D F',
+    
+    # Common acronyms
+    r'\bdb\b': 'D B',
+    r'\bapi\b': 'A P I',
+    r'\burl\b': 'U R L',
+    r'\bid\b': 'I D',
+    r'\buuid\b': 'U U I D',
+    r'\bjwt\b': 'J W T',
+    r'\boauth\b': 'Oh auth',
+    r'\bhttp\b': 'H T T P',
+    r'\bhttps\b': 'H T T P S',
+    r'\brest\b': 'rest',
+    r'\bcrud\b': 'crud',
+    r'\bcli\b': 'C L I',
+    r'\bgui\b': 'gooey',
+    r'\btts\b': 'text to speech',
+    r'\bai\b': 'A I',
+    r'\bml\b': 'M L',
+    r'\bllm\b': 'L L M',
+    
+    # Programming terms
+    r'\bauth\b': 'authentication',
+    r'\bconfig\b': 'configuration',
+    r'\benv\b': 'environment',
+    r'\bdev\b': 'development',
+    r'\bprod\b': 'production',
+    
+    # File extensions with dots
+    r'\.json\b': ' dot jay-sawn',
+    r'\.py\b': ' dot python',
+    r'\.js\b': ' dot java script',
+    r'\.sql\b': ' dot sequel',
+    r'\.yml\b': ' dot yam-el',
+    r'\.yaml\b': ' dot yam-el',
+}
+
+# Pre-compile all patterns for efficiency
+COMPILED_PATTERNS = [(re.compile(pattern, re.IGNORECASE), replacement) 
+                     for pattern, replacement in TECH_TERM_PATTERNS.items()]
+
 def preserve_inline_code_content(text):
     """
     Intelligently handle inline code - preserve the content for speech while removing wrapper tokens.
@@ -69,6 +122,9 @@ def clean_text_for_speech(text):
     
     # Remove all emojis for better speech
     text = remove_emojis(text)
+    
+    # Convert technical terms to speech-friendly versions
+    text = convert_technical_terms_to_speech(text)
     
     # Add natural speech markup before cleaning whitespace
     text = add_speech_markup(text)
@@ -142,47 +198,26 @@ def remove_emojis(text):
     
     return text
 
-def variable_to_speech(var_name):
+def convert_technical_terms_to_speech(text):
     """
-    Convert variable names and technical terms to natural speech.
+    Convert technical terms and acronyms in prose to natural speech pronunciation.
+    Works on full sentences, not just isolated terms.
     
     Examples:
-    - session_id -> "session I D"
-    - stop_hook_active -> "stop hook active"
-    - apiKey -> "A P I key"
+    - "The JSON config file" -> "The jay-sawn configuration file"
+    - "Use the API_KEY" -> "Use the A P I KEY" 
+    - "Check config.json" -> "Check configuration dot jay-sawn"
+    - "Query the SQL database" -> "Query the sequel database"
+    - "The user_id field" -> "The user I D field"
+    - "api_key variable" -> "A P I key variable"
     """
-    # Split on underscores and camelCase
-    words = re.sub(r'([A-Z])', r' \1', var_name).split('_')
-    words = [word.strip() for word in words if word.strip()]
+    # First, replace underscores and hyphens with spaces to break up compound terms
+    # This ensures "api_key" becomes "api key" before we process acronyms
+    text = text.replace('_', ' ')
+    text = text.replace('-', ' ')
     
-    # Convert common programming terms to speech-friendly versions
-    replacements = {
-        'id': 'I D',
-        'url': 'U R L', 
-        'api': 'A P I',
-        'tts': 'text to speech',
-        'config': 'configuration',
-        'json': 'jay-sawn',  # JSON sounds like "jay-sawn"
-        'xml': 'X M L',
-        'html': 'H T M L',
-        'css': 'C S S',
-        'js': 'java script',
-        'py': 'python',
-        'sql': 'sequel',  # SQL commonly pronounced as "sequel"
-        'db': 'database',
-        'auth': 'authentication',
-        'oauth': 'O auth',
-        'jwt': 'J W T',
-        'uuid': 'U U I D',
-        'crud': 'crud'  # CRUD sounds like "crud"
-    }
+    # Apply all pre-compiled patterns efficiently
+    for pattern, replacement in COMPILED_PATTERNS:
+        text = pattern.sub(replacement, text)
     
-    result_words = []
-    for word in words:
-        lower_word = word.lower()
-        if lower_word in replacements:
-            result_words.append(replacements[lower_word])
-        else:
-            result_words.append(word)
-    
-    return ' '.join(result_words)
+    return text
