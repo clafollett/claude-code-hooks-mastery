@@ -43,13 +43,12 @@ TECH_TERM_PATTERNS = {
     r'\bai\b': 'A I',
     r'\bml\b': 'M L',
     r'\bllm\b': 'L L M',
+    r'\btodo\b': 'to do',
+    r'\btodos\b': "to do's",
+    r'\bwip\b': 'work in progress',
     
     # Programming terms
-    r'\bauth\b': 'authentication',
-    r'\bconfig\b': 'configuration',
     r'\benv\b': 'environment',
-    r'\bdev\b': 'development',
-    r'\bprod\b': 'production',
     
     # File extensions with dots
     r'\.json\b': ' dot jay-sawn',
@@ -58,6 +57,31 @@ TECH_TERM_PATTERNS = {
     r'\.sql\b': ' dot sequel',
     r'\.yml\b': ' dot yam-el',
     r'\.yaml\b': ' dot yam-el',
+    
+    # Common chat terms and reactions
+    r'\bha\b': 'hah',
+    r'\bhaha\b': 'hahah',
+    r'\blol\b': 'L O L',
+    r'\blmao\b': 'lamow',
+    r'\brofl\b': 'roffle',
+    r'\bhmm\b': 'hmmm',
+    r'\bugh\b': 'ugh',
+    r'\bmeh\b': 'meh',
+    r'\bomg\b': 'oh em gee',
+    r'\bwtf\b': 'what the eff',
+    r'\bidk\b': "I don't know",
+    r'\bimo\b': 'in my opinion',
+    r'\bimho\b': 'in my humble opinion',
+    r'\bbtw\b': 'by the way',
+    r'\bfyi\b': 'eff why eye',
+    r'\btbh\b': 'to be honest',
+    r'\bsmh\b': 'shaking my head',
+    r'\birl\b': 'in real life',
+    r'\bdm\b': 'direct message',
+    r'\bok\b': 'okay',
+    r'\bthx\b': 'thanks',
+    r'\bplz\b': 'please',
+    r'\byw\b': "you're welcome",
 }
 
 # Pre-compile all patterns for efficiency
@@ -183,6 +207,42 @@ def add_speech_markup(text):
     
     return text
 
+def handle_elongated_expressions(text):
+    """
+    Handle elongated expressions to prevent TTS from spelling them out letter by letter.
+    Detects repeated letters in any case and ensures natural pronunciation.
+    
+    Examples:
+    - "YESSSSS!" -> "Yesssss!"
+    - "yeeesssss" -> "yeeesssss" (already lowercase, no change needed)
+    - "NOOOOO" -> "Nooooo"
+    - "YEEEssss" -> "Yeeessss"
+    - "But API stays API" (only affects words with 3+ repeated letters)
+    """
+    def fix_elongated_word(match):
+        word = match.group(0)
+        
+        # Check if word has 3+ consecutive repeated letters
+        has_repetition = False
+        for i in range(len(word) - 2):
+            if word[i].lower() == word[i+1].lower() == word[i+2].lower():
+                has_repetition = True
+                break
+        
+        if has_repetition:
+            # If all uppercase, convert to title case to prevent letter-by-letter reading
+            if word.isupper():
+                return word.capitalize()
+            # If mixed case with uppercase repetition, lowercase it
+            elif any(c.isupper() for c in word):
+                return word.lower()
+        
+        return word
+    
+    # Match any word (including mixed case)
+    pattern = re.compile(r'\b\w+\b')
+    return pattern.sub(fix_elongated_word, text)
+
 def remove_emojis(text):
     """
     Remove all Unicode emoji ranges from text for clean TTS speech.
@@ -210,7 +270,13 @@ def convert_technical_terms_to_speech(text):
     - "Query the SQL database" -> "Query the sequel database"
     - "The user_id field" -> "The user I D field"
     - "api_key variable" -> "A P I key variable"
+    - "YESSSSS!" -> "YESSSS!" (not "Y E S S S S")
+    - "NOOOOO" -> "NOOOO" (not "N O O O O")
     """
+    # Handle elongated expressions (YESSSSS, NOOOOO, etc) before other processing
+    # Convert to lowercase for natural speech while preserving repetition
+    text = handle_elongated_expressions(text)
+    
     # First, replace underscores and hyphens with spaces to break up compound terms
     # This ensures "api_key" becomes "api key" before we process acronyms
     text = text.replace('_', ' ')
